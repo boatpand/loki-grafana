@@ -1,0 +1,73 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchsize: 1048576
+
+scrape_configs:
+  - job_name: cms-log
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: cms-log
+          __path__: /var/lib/docker/containers/cms*.log
+
+    pipeline_stages:
+    - match:
+        selector: '{job="cms-log"}'
+        stages:
+        - regex:
+            expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}\w\d{2}:\d{2}:\d{2}\.\d{3}).*: (?P<http_method>\S+) (?P<api_path>\S+) \((?P<response_time>\d+) ms\) (?P<status_code>\d+)$'
+        - labels:
+            timestamp: timestamp
+            http_method: http_method
+            api_path: api_path
+            response_time: response_time
+            status_code: status_code
+        # - timestamp:
+        #     source: timestamp
+        #     format: "2006-01-02T15:04:05.000"
+        #     location: "Asia/Bangkok"
+
+  - job_name: nginx-log
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-log
+          __path__: /var/lib/docker/containers/*.json
+
+    pipeline_stages:
+    - match:
+        selector: '{job="nginx-log"}'
+        stages:
+        - json:
+            expressions:
+              time: time
+              remote_ip: remote_ip
+              remote_user: remote_user
+              request: request
+              response: response
+              bytes: bytes
+              referrer: referrer
+              agent: agent
+        - labels:
+              time: time
+              remote_ip: remote_ip
+              remote_user: remote_user
+              request: request
+              response: response
+              bytes: bytes
+              referrer: referrer
+              agent: agent
+        # - timestamp:
+        #     source: timestamp
+        #     format: "2006-01-02T15:04:05.000"
+        #     location: "Asia/Bangkok"
